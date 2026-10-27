@@ -15,6 +15,7 @@ import {
   CheckCircle2,
   AlertCircle,
   FileCode,
+  Upload,
 } from 'lucide-react'
 
 function TemplatesContent() {
@@ -31,15 +32,37 @@ function TemplatesContent() {
   const [showAddModal, setShowAddModal] = useState(false)
   const [newTemplate, setNewTemplate] = useState({
     title: '',
-    category: 'Business Cards',
-    sizeLabel: '3.5" × 2"',
+    category: 'Letterheads & Pads',
+    sizeLabel: 'Letter / A4',
     badgeLabel: 'HOT',
-    colorTheme: 'terracotta',
-    width: '1050',
-    height: '600',
-    icon: '💼',
+    colorTheme: 'slate',
+    width: '730',
+    height: '888',
+    icon: '📋',
+    svgContent: '',
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const handleSvgUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      const content = event.target?.result as string
+      const titleFromFile = file.name
+        .replace(/\.[^/.]+$/, '')
+        .replace(/[-_]+/g, ' ')
+        .replace(/\b\w/g, (c) => c.toUpperCase())
+
+      setNewTemplate((prev) => ({
+        ...prev,
+        title: prev.title || titleFromFile,
+        svgContent: content,
+      }))
+    }
+    reader.readAsText(file)
+  }
 
   // Inspect JSON Modal
   const [inspectingTemplate, setInspectingTemplate] = useState<Template | null>(null)
@@ -114,7 +137,7 @@ function TemplatesContent() {
     dl.click()
   }
 
-  const categories = ['all', 'Menus', 'Cards', 'Business Cards', 'Social Media', 'Badges', 'Events']
+  const categories = ['all', 'Letterheads & Pads', 'Menus', 'Cards', 'Business Cards', 'Social Media', 'Badges', 'Events']
 
   return (
     <div className="space-y-6">
@@ -337,6 +360,26 @@ function TemplatesContent() {
             </div>
 
             <form onSubmit={handleCreateTemplate} className="space-y-4 pt-4">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
+                  Vector SVG File (Auto-Imports & Converts)
+                </label>
+                <label className="border-2 border-dashed border-gray-200 hover:border-red-500 rounded-xl p-3 flex items-center justify-center gap-2 cursor-pointer bg-gray-50/50 hover:bg-red-50/20 transition-all text-center">
+                  <Upload className="w-4 h-4 text-red-600 shrink-0" />
+                  <span className="text-xs font-semibold text-gray-700 truncate">
+                    {newTemplate.svgContent
+                      ? '✓ SVG Loaded (Auto-Extracts Vectors & Text)'
+                      : 'Choose .SVG from Illustrator / Figma'}
+                  </span>
+                  <input
+                    type="file"
+                    accept=".svg,image/svg+xml"
+                    onChange={handleSvgUpload}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
                   Template Title

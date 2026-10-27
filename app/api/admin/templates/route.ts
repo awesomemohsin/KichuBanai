@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/auth/server-auth'
 import { DEFAULT_TEMPLATES } from '@/lib/templates/template-registry'
 import { Template } from '@/types/domain'
+import { importSvgAsTemplate } from '@/lib/templates/svg-importer'
 
 let customTemplates: Template[] = []
 
@@ -46,10 +47,29 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
-    const { title, category, sizeLabel, badgeLabel, colorTheme, width, height, icon } = body
+    const { title, category, sizeLabel, badgeLabel, colorTheme, width, height, icon, svgContent } = body
 
     if (!title || !category) {
       return NextResponse.json({ error: 'Title and category are required' }, { status: 400 })
+    }
+
+    // If SVG content is provided, automatically parse vector graphics, typography, and quick edit fields!
+    if (svgContent && typeof svgContent === 'string' && svgContent.includes('<svg')) {
+      const imported = importSvgAsTemplate(svgContent, {
+        title: title.trim(),
+        category: category.trim(),
+        sizeLabel,
+        badgeLabel,
+        colorTheme,
+        icon,
+      })
+      customTemplates.unshift(imported.template)
+
+      return NextResponse.json({
+        success: true,
+        template: imported.template,
+        extractedElementsCount: imported.extractedTextElements.length,
+      })
     }
 
     const newTemplate: Template = {
