@@ -382,7 +382,7 @@ export default function Page() {
 
                 {/* Filter Pills */}
                 <div className="filter-row">
-                  {['All', 'Menus', 'Business cards', 'Posters', 'Promotions'].map((cat) => (
+                  {['All', 'Letterheads & Pads', 'Menus', 'Business cards', 'Posters', 'Promotions'].map((cat) => (
                     <button
                       key={cat}
                       className={`filter-pill cursor-pointer ${selectedCategory === cat ? 'active' : ''}`}
