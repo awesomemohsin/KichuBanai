@@ -77,7 +77,7 @@ export function DesignEditorModal({ isOpen, onClose, onOrderSuccess }: DesignEdi
 
   // Extract quick edit fields from current design
   const quickEditElements = design.elements.filter(
-    (el) => (el as TextElement).quickEditKey && el.permissions.editable
+    (el) => el.type === 'text' && (el as TextElement).quickEditKey && el.permissions.editable
   ) as TextElement[]
 
   const handleAddText = () => {
@@ -315,9 +315,9 @@ export function DesignEditorModal({ isOpen, onClose, onOrderSuccess }: DesignEdi
                 {quickEditElements.map((el) => (
                   <label key={el.id} className="block text-[10px] font-bold text-[#6e6861]">
                     {el.quickEditLabel || el.name}
-                    {el.text.includes('\n') ? (
+                    {(el.text || '').includes('\n') ? (
                       <textarea
-                        value={el.text}
+                        value={el.text || ''}
                         rows={3}
                         onChange={(e) => updateQuickEditField(el.quickEditKey!, e.target.value)}
                         className="w-full p-2 mt-1 text-xs bg-[#faf9f7] border border-[#e4e1dc] rounded-md outline-none"
@@ -325,7 +325,7 @@ export function DesignEditorModal({ isOpen, onClose, onOrderSuccess }: DesignEdi
                     ) : (
                       <input
                         type="text"
-                        value={el.text}
+                        value={el.text || ''}
                         onChange={(e) => updateQuickEditField(el.quickEditKey!, e.target.value)}
                         className="w-full h-8 px-2 mt-1 text-xs bg-[#faf9f7] border border-[#e4e1dc] rounded-md outline-none"
                       />

@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useRef, useState } from 'react'
-import { DesignData, DesignElement, TextElement } from '@/types/domain'
+import { DesignData, DesignElement, TextElement, SvgElement } from '@/types/domain'
 
 interface CanvasRendererProps {
   design: DesignData
@@ -70,6 +70,16 @@ export function CanvasRenderer({
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
     >
+      {/* Background Image / Art if specified */}
+      {design.background.image && (
+        <img
+          src={design.background.image}
+          alt="Canvas Background"
+          className="absolute inset-0 w-full h-full object-cover pointer-events-none select-none"
+          style={{ opacity: design.background.opacity ?? 1 }}
+        />
+      )}
+
       {/* Bleed & Safe Margin Guides (Visual print cues) */}
       <div
         className="absolute inset-0 pointer-events-none border border-dashed border-red-300/40"
@@ -124,6 +134,14 @@ export function CanvasRenderer({
               />
             )}
 
+            {/* SVG Vector Graphic Element */}
+            {el.type === 'svg' && (
+              <div
+                className="w-full h-full pointer-events-none select-none overflow-hidden"
+                dangerouslySetInnerHTML={{ __html: (el as SvgElement).svgContent }}
+              />
+            )}
+
             {/* Text Element */}
             {el.type === 'text' && (
               <div
@@ -150,7 +168,7 @@ export function CanvasRenderer({
               <img
                 src={el.src}
                 alt={el.name}
-                className="w-full h-full object-contain pointer-events-none"
+                className="w-full h-full object-contain pointer-events-none select-none"
               />
             )}
 

@@ -136,6 +136,7 @@ export function generateProductionOutlinedSvg(design: DesignData): OutliningResu
      height="${height}">
   <!-- Bleed & Background -->
   <rect width="${width}" height="${height}" fill="${design.background.color || '#ffffff'}" />
+  ${design.background.image ? `<image href="${design.background.image}" width="${width}" height="${height}" opacity="${design.background.opacity ?? 1}" preserveAspectRatio="none" />\n` : ''}
 ${elementsSvg}</svg>`
 
   // Validate the resulting SVG

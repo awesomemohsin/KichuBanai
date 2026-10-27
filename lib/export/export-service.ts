@@ -41,6 +41,28 @@ export async function renderDesignToJpg(options: RenderJpgOptions): Promise<{ da
   ctx.fillStyle = design.background.color || '#ffffff'
   ctx.fillRect(0, 0, origWidth, origHeight)
 
+  if (design.background.image) {
+    try {
+      const bgImg = new Image()
+      bgImg.crossOrigin = 'anonymous'
+      await new Promise<void>((resolve) => {
+        bgImg.onload = () => {
+          ctx.save()
+          if (design.background.opacity !== undefined) {
+            ctx.globalAlpha = design.background.opacity
+          }
+          ctx.drawImage(bgImg, 0, 0, origWidth, origHeight)
+          ctx.restore()
+          resolve()
+        }
+        bgImg.onerror = () => resolve()
+        bgImg.src = design.background.image!
+      })
+    } catch {
+      // background image load fallback
+    }
+  }
+
   // 2. Render elements in z-index order
   const elements = [...design.elements].sort((a, b) => a.zIndex - b.zIndex)
 
@@ -89,6 +111,41 @@ export async function renderDesignToJpg(options: RenderJpgOptions): Promise<{ da
         }
         ctx.fillText(line, textX, el.y + index * lineHeight)
       })
+    } else if (el.type === 'image' || el.type === 'logo') {
+      try {
+        const img = new Image()
+        img.crossOrigin = 'anonymous'
+        await new Promise<void>((resolve) => {
+          img.onload = () => {
+            ctx.drawImage(img, el.x, el.y, el.width, el.height)
+            resolve()
+          }
+          img.onerror = () => resolve()
+          img.src = el.src
+        })
+      } catch {
+        // image render fallback
+      }
+    } else if (el.type === 'svg') {
+      try {
+        const svgBlob = new Blob([el.svgContent], { type: 'image/svg+xml;charset=utf-8' })
+        const url = URL.createObjectURL(svgBlob)
+        const img = new Image()
+        await new Promise<void>((resolve) => {
+          img.onload = () => {
+            ctx.drawImage(img, el.x, el.y, el.width, el.height)
+            URL.revokeObjectURL(url)
+            resolve()
+          }
+          img.onerror = () => {
+            URL.revokeObjectURL(url)
+            resolve()
+          }
+          img.src = url
+        })
+      } catch {
+        // svg render fallback
+      }
     }
 
     ctx.restore()

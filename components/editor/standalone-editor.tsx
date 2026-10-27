@@ -125,7 +125,7 @@ export function StandaloneEditor({ designId, initialTemplateId }: StandaloneEdit
   const selectedElement = design.elements.find((el) => el.id === selectedElementId)
 
   const quickEditElements = design.elements.filter(
-    (el) => (el as TextElement).quickEditKey && el.permissions.editable
+    (el) => el.type === 'text' && (el as TextElement).quickEditKey && el.permissions.editable
   ) as TextElement[]
 
   const handleAddText = () => {
@@ -191,6 +191,20 @@ export function StandaloneEditor({ designId, initialTemplateId }: StandaloneEdit
     const reader = new FileReader()
     reader.onload = (event) => {
       const dataUrl = event.target?.result as string
+
+      // If a company-logo or quickEditKey 'logo' exists, replace its source directly for instant seamless editing
+      const existingLogo = design.elements.find(
+        (el) => el.id === 'company-logo' || (el as any).quickEditKey === 'logo'
+      )
+      if (existingLogo) {
+        updateElement(existingLogo.id, {
+          src: dataUrl,
+          type: 'image',
+          name: file.name.slice(0, 16),
+        } as any)
+        return
+      }
+
       const newImg: DesignElement = {
         id: `img-${Date.now()}`,
         type: 'image',
@@ -429,9 +443,9 @@ export function StandaloneEditor({ designId, initialTemplateId }: StandaloneEdit
               {quickEditElements.map((el) => (
                 <label key={el.id} className="block text-[10px] font-bold text-[#6e6861]">
                   {el.quickEditLabel || el.name}
-                  {el.text.includes('\n') ? (
+                  {(el.text || '').includes('\n') ? (
                     <textarea
-                      value={el.text}
+                      value={el.text || ''}
                       rows={3}
                       onChange={(e) => updateQuickEditField(el.quickEditKey!, e.target.value)}
                       className="w-full p-2 mt-1 text-xs bg-[#faf9f7] border border-[#e4e1dc] rounded-md outline-none focus:border-[#e26f5b]"
@@ -439,7 +453,7 @@ export function StandaloneEditor({ designId, initialTemplateId }: StandaloneEdit
                   ) : (
                     <input
                       type="text"
-                      value={el.text}
+                      value={el.text || ''}
                       onChange={(e) => updateQuickEditField(el.quickEditKey!, e.target.value)}
                       className="w-full h-8 px-2 mt-1 text-xs bg-[#faf9f7] border border-[#e4e1dc] rounded-md outline-none focus:border-[#e26f5b]"
                     />
