@@ -98,4 +98,30 @@ export const PRINT_PRODUCTS: PrintProduct[] = [
     minRecommendedDpi: 300,
     active: true,
   },
+  {
+    id: 'prod-memo-pads',
+    name: 'Executive Letterheads & Memo Pads',
+    slug: 'memo-pads',
+    description: 'Crisp corporate letterhead and prescription memo pads with glued top binding and premium paper stocks.',
+    category: 'Letterheads & Pads',
+    standardSizes: [
+      { id: 'size-pad-std', name: 'Letter / A4 Standard (215 × 261 mm)', dimensions: { width: 730, height: 888, unit: 'px', orientation: 'portrait', bleedMm: 3, safeMarginMm: 5 } },
+      { id: 'size-pad-a5', name: 'A5 Executive Memo (148 × 210 mm)', dimensions: { width: 516, height: 730, unit: 'px', orientation: 'portrait', bleedMm: 3, safeMarginMm: 4 } },
+    ],
+    quantityTiers: [25, 50, 100, 250, 500],
+    materials: [
+      { id: 'mat-100-bond', name: '100 GSM Premium Executive Bond Paper', gsm: 100, baseUnitPrice: 8.5 },
+      { id: 'mat-120-laid', name: '120 GSM Watermarked Royal Laid Paper', gsm: 120, baseUnitPrice: 12.0 },
+      { id: 'mat-80-offset', name: '80 GSM Economy Notepad Paper', gsm: 80, baseUnitPrice: 5.5 },
+    ],
+    finishes: [
+      { id: 'fin-glue-top', name: 'Top-Edge Glued Pad (50 sheets/pad)', priceMultiplier: 1.0 },
+      { id: 'fin-wire-spiral', name: 'Top Wire-O Spiral Bound', priceMultiplier: 1.25 },
+      { id: 'fin-loose-sheets', name: 'Individual Loose Letterhead Sheets', priceMultiplier: 0.9 },
+    ],
+    defaultBleedMm: 3,
+    defaultSafeMarginMm: 5,
+    minRecommendedDpi: 300,
+    active: true,
+  },
 ]

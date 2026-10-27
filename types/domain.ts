@@ -136,7 +136,16 @@ export interface TemplateMetadata {
   slug: string
   title: string
   description?: string
-  category: 'Menus' | 'Promotions' | 'Social posts' | 'Invitations' | 'Business cards' | 'Posters' | 'Certificates' | 'Packaging'
+  category:
+    | 'Menus'
+    | 'Promotions'
+    | 'Social posts'
+    | 'Invitations'
+    | 'Business cards'
+    | 'Posters'
+    | 'Certificates'
+    | 'Packaging'
+    | 'Letterheads & Pads'
   sizeLabel: string
   badgeLabel?: string
   colorTheme: string
