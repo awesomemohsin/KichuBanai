@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { DesignData, DesignElement, DesignMetadata, Template, TextElement } from '@/types/domain'
 import { DEFAULT_TEMPLATES } from '@/lib/templates/template-registry'
+import { estimateTextHeight } from './editor-utils'
 
 export type EditorMode = 'quick' | 'full'
 export type EditorTool = 'templates' | 'text' | 'uploads' | 'elements' | 'styles' | 'settings'
@@ -33,13 +34,16 @@ export interface EditorState {
   setZoom: (zoom: number) => void
   selectElement: (id: string | null) => void
 
-  updateElement: (id: string, updates: Partial<DesignElement>) => void
+  updateElement: (id: string, updates: Partial<DesignElement>, recordHistory?: boolean) => void
   updateQuickEditField: (fieldKey: string, value: string) => void
   addElement: (element: DesignElement) => void
   deleteElement: (id: string) => void
   duplicateElement: (id: string) => void
   toggleLock: (id: string) => void
   toggleVisibility: (id: string) => void
+  toggleGroup: (id: string) => void
+  updateMultipleElementsPositions: (updates: { id: string; x: number; y: number }[]) => void
+  replaceElementImage: (id: string, src: string, name?: string) => void
   reorderLayer: (id: string, direction: 'up' | 'down') => void
 
   undo: () => void
@@ -72,7 +76,7 @@ export const useEditorStore = create<EditorState>((set, get) => {
     design: clone(initialTemplate.design),
     metadata: initialMetadata,
     selectedElementId: null,
-    activeTool: 'templates',
+    activeTool: 'uploads',
     editorMode: 'quick',
     zoom: 1,
     saveStatus: 'saved',
@@ -206,12 +210,12 @@ export const useEditorStore = create<EditorState>((set, get) => {
     setZoom: (zoom: number) => set({ zoom }),
     selectElement: (id: string | null) => set({ selectedElementId: id }),
 
-    updateElement: (id: string, updates: Partial<DesignElement>) => {
+    updateElement: (id: string, updates: Partial<DesignElement>, recordHistory: boolean = true) => {
       const state = get()
       const element = state.design.elements.find((el) => el.id === id)
       if (!element || element.permissions.locked) return
 
-      // Push to undo history
+      // Push to undo history only if recordHistory is true
       const currentEntry: EditorHistoryEntry = {
         design: clone(state.design),
         metadata: clone(state.metadata),
@@ -219,19 +223,41 @@ export const useEditorStore = create<EditorState>((set, get) => {
 
       const updatedElements = state.design.elements.map((el) => {
         if (el.id === id) {
-          return { ...el, ...updates } as DesignElement
+          const merged = { ...el, ...updates } as DesignElement
+          if (merged.type === 'text') {
+            const textEl = merged as TextElement
+            const minHeight = estimateTextHeight(
+              textEl.text,
+              textEl.fontSize,
+              textEl.width,
+              textEl.lineHeight || 1.3
+            )
+            // Ensure height never clips text
+            if (updates.height === undefined || updates.height < minHeight) {
+              merged.height = minHeight
+            }
+          }
+          return merged
         }
         return el
       })
 
+      // Track font in fontsUsed if new font added
+      let fontsUsed = state.design.fontsUsed || []
+      const textUpdate = updates as Partial<TextElement>
+      if (textUpdate.fontFamily && !fontsUsed.includes(textUpdate.fontFamily)) {
+        fontsUsed = [...fontsUsed, textUpdate.fontFamily]
+      }
+
       set({
-        past: [...state.past.slice(-20), currentEntry],
-        future: [],
+        past: recordHistory ? [...state.past.slice(-20), currentEntry] : state.past,
+        future: recordHistory ? [] : state.future,
         design: {
           ...state.design,
+          fontsUsed,
           elements: updatedElements,
         },
-        saveStatus: 'unsaved',
+        saveStatus: recordHistory ? 'unsaved' : state.saveStatus,
       })
     },
 
@@ -250,7 +276,15 @@ export const useEditorStore = create<EditorState>((set, get) => {
 
       const updatedElements = state.design.elements.map((el) => {
         if ((el as TextElement).quickEditKey === fieldKey) {
-          return { ...el, text: value } as DesignElement
+          const textEl = { ...el, text: value } as TextElement
+          const minHeight = estimateTextHeight(
+            value,
+            textEl.fontSize,
+            textEl.width,
+            textEl.lineHeight || 1.3
+          )
+          textEl.height = Math.max(textEl.height, minHeight)
+          return textEl as DesignElement
         }
         return el
       })
@@ -295,14 +329,128 @@ export const useEditorStore = create<EditorState>((set, get) => {
         metadata: clone(state.metadata),
       }
 
+      // Hide element in layers so it can be unhidden anytime, and recorded in undo history
+      const updatedElements = state.design.elements.map((el) => {
+        if (el.id === id) {
+          return {
+            ...el,
+            permissions: {
+              ...el.permissions,
+              visible: false,
+            },
+          }
+        }
+        return el
+      })
+
       set({
         past: [...state.past.slice(-20), currentEntry],
         future: [],
         design: {
           ...state.design,
-          elements: state.design.elements.filter((el) => el.id !== id),
+          elements: updatedElements,
         },
         selectedElementId: null,
+        saveStatus: 'unsaved',
+      })
+    },
+
+    toggleGroup: (id: string) => {
+      const state = get()
+      const element = state.design.elements.find((el) => el.id === id)
+      if (!element) return
+
+      const currentEntry: EditorHistoryEntry = {
+        design: clone(state.design),
+        metadata: clone(state.metadata),
+      }
+
+      if (element.groupId) {
+        // Ungroup all elements in this group
+        const targetGroupId = element.groupId
+        const updated = state.design.elements.map((el) => {
+          if (el.groupId === targetGroupId) {
+            const next = { ...el }
+            delete next.groupId
+            delete next.groupName
+            return next
+          }
+          return el
+        })
+        set({
+          past: [...state.past.slice(-20), currentEntry],
+          future: [],
+          design: { ...state.design, elements: updated },
+          saveStatus: 'unsaved',
+        })
+      } else {
+        // Group with new group ID
+        const newGroupId = `group-${Date.now()}`
+        const updated = state.design.elements.map((el) => {
+          if (el.id === id) {
+            return { ...el, groupId: newGroupId, groupName: 'Group' }
+          }
+          return el
+        })
+        set({
+          past: [...state.past.slice(-20), currentEntry],
+          future: [],
+          design: { ...state.design, elements: updated },
+          saveStatus: 'unsaved',
+        })
+      }
+    },
+
+    updateMultipleElementsPositions: (updates: { id: string; x: number; y: number }[]) => {
+      const state = get()
+      const updatesMap = new Map(updates.map((u) => [u.id, { x: u.x, y: u.y }]))
+
+      const updatedElements = state.design.elements.map((el) => {
+        const pos = updatesMap.get(el.id)
+        if (pos) {
+          return { ...el, x: pos.x, y: pos.y }
+        }
+        return el
+      })
+
+      set({
+        design: {
+          ...state.design,
+          elements: updatedElements,
+        },
+        saveStatus: 'unsaved',
+      })
+    },
+
+    replaceElementImage: (id: string, src: string, name?: string) => {
+      const state = get()
+      const element = state.design.elements.find((el) => el.id === id)
+      if (!element) return
+
+      const currentEntry: EditorHistoryEntry = {
+        design: clone(state.design),
+        metadata: clone(state.metadata),
+      }
+
+      const updatedElements = state.design.elements.map((el) => {
+        if (el.id === id) {
+          return {
+            ...el,
+            type: 'image' as const,
+            src,
+            name: name || el.name,
+          } as DesignElement
+        }
+        return el
+      })
+
+      set({
+        past: [...state.past.slice(-20), currentEntry],
+        future: [],
+        design: {
+          ...state.design,
+          elements: updatedElements,
+        },
         saveStatus: 'unsaved',
       })
     },

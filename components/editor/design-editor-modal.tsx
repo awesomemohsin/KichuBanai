@@ -10,8 +10,8 @@ import {
   Eye,
   EyeOff,
   Grid2X2,
+  Image as ImageIcon,
   Layers3,
-  LayoutTemplate,
   Lock,
   MoreHorizontal,
   Move,
@@ -30,7 +30,6 @@ import { useEditorStore } from '@/lib/editor/editor-store'
 import { CanvasRenderer } from './canvas-renderer'
 import { DownloadModal } from './download-modal'
 import { PrintOrderDialog } from '../orders/print-order-dialog'
-import { DEFAULT_TEMPLATES } from '@/lib/templates/template-registry'
 import { DesignElement, TextElement } from '@/types/domain'
 
 interface DesignEditorModalProps {
@@ -70,6 +69,8 @@ export function DesignEditorModal({ isOpen, onClose, onOrderSuccess }: DesignEdi
 
   const [downloadModalOpen, setDownloadModalOpen] = useState(false)
   const [printDialogOpen, setPrintDialogOpen] = useState(false)
+  const [uploadedImages, setUploadedImages] = useState<string[]>([])
+  const replaceFileInputRef = React.useRef<HTMLInputElement>(null)
 
   if (!isOpen) return null
 
@@ -143,13 +144,24 @@ export function DesignEditorModal({ isOpen, onClose, onOrderSuccess }: DesignEdi
     const reader = new FileReader()
     reader.onload = (event) => {
       const dataUrl = event.target?.result as string
+      setUploadedImages((prev) => [dataUrl, ...prev.slice(0, 19)])
+
+      // If an image or logo is currently selected, replace its source directly!
+      if (selectedElement && (selectedElement.type === 'image' || selectedElement.type === 'logo')) {
+        updateElement(selectedElement.id, {
+          src: dataUrl,
+          name: file.name.slice(0, 16),
+        } as any)
+        return
+      }
+
       const newImg: DesignElement = {
         id: `img-${Date.now()}`,
         type: 'image',
         name: file.name.slice(0, 16),
         src: dataUrl,
-        x: 100,
-        y: 100,
+        x: Math.round(design.canvas.width / 2 - 100),
+        y: Math.round(design.canvas.height / 2 - 75),
         width: 200,
         height: 150,
         zIndex: design.elements.length + 1,
@@ -173,6 +185,15 @@ export function DesignEditorModal({ isOpen, onClose, onOrderSuccess }: DesignEdi
   return (
     <div className="modal-layer">
       <div className="editor-window flex flex-col">
+        {/* Hidden File Input for Replace Logo / Image */}
+        <input
+          type="file"
+          ref={replaceFileInputRef}
+          accept="image/*,.svg"
+          onChange={handleFileUpload}
+          className="hidden"
+        />
+
         {/* Topbar */}
         <header className="editor-topbar">
           <div className="editor-brand">
@@ -239,11 +260,11 @@ export function DesignEditorModal({ isOpen, onClose, onOrderSuccess }: DesignEdi
           {/* Tool Selector Bar */}
           <aside className="editor-tools">
             <button
-              className={`editor-tool cursor-pointer ${activeTool === 'templates' ? 'active' : ''}`}
-              onClick={() => setActiveTool('templates')}
+              className={`editor-tool cursor-pointer ${activeTool === 'uploads' ? 'active' : ''}`}
+              onClick={() => setActiveTool('uploads')}
             >
-              <LayoutTemplate />
-              <span>Templates</span>
+              <Upload />
+              <span>Uploads</span>
             </button>
             <button
               className={`editor-tool cursor-pointer ${activeTool === 'text' ? 'active' : ''}`}
@@ -253,13 +274,6 @@ export function DesignEditorModal({ isOpen, onClose, onOrderSuccess }: DesignEdi
               <span>Text</span>
             </button>
             <button
-              className={`editor-tool cursor-pointer ${activeTool === 'uploads' ? 'active' : ''}`}
-              onClick={() => setActiveTool('uploads')}
-            >
-              <Upload />
-              <span>Uploads</span>
-            </button>
-            <button
               className={`editor-tool cursor-pointer ${activeTool === 'elements' ? 'active' : ''}`}
               onClick={() => setActiveTool('elements')}
             >
@@ -267,11 +281,11 @@ export function DesignEditorModal({ isOpen, onClose, onOrderSuccess }: DesignEdi
               <span>Elements</span>
             </button>
             <button
-              className={`editor-tool cursor-pointer ${activeTool === 'styles' ? 'active' : ''}`}
-              onClick={() => setActiveTool('styles')}
+              className={`editor-tool cursor-pointer ${activeTool === 'settings' ? 'active' : ''}`}
+              onClick={() => setActiveTool('settings')}
             >
-              <Palette />
-              <span>Colors</span>
+              <Layers3 />
+              <span>Layers</span>
             </button>
             <div className="editor-tool-spacer" />
           </aside>
@@ -348,28 +362,192 @@ export function DesignEditorModal({ isOpen, onClose, onOrderSuccess }: DesignEdi
               /* Full Edit Panel */
               <div className="space-y-5 text-xs">
                 {/* Active Tool Specific Options */}
-                {activeTool === 'templates' && (
-                  <div className="space-y-2">
-                    <span className="text-[10px] font-bold text-[#817e79] uppercase">Switch Template</span>
-                    <div className="space-y-2">
-                      {DEFAULT_TEMPLATES.map((tpl) => (
-                        <button
-                          key={tpl.metadata.id}
-                          onClick={() => loadFromTemplate(tpl)}
-                          className={`w-full p-2.5 rounded-lg border text-left flex items-center justify-between cursor-pointer transition-all ${
-                            metadata.templateId === tpl.metadata.id
-                              ? 'bg-white border-[#e26f5b] shadow-xs'
-                              : 'bg-[#faf9f7] border-[#e4e1dc] hover:bg-white'
-                          }`}
-                        >
-                          <div>
-                            <strong className="block text-xs text-[#20201f]">{tpl.metadata.title}</strong>
-                            <small className="text-[#817e79]">{tpl.metadata.category} · {tpl.metadata.sizeLabel}</small>
-                          </div>
-                          <span>{tpl.metadata.icon}</span>
-                        </button>
-                      ))}
+                {activeTool === 'uploads' && (
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="text-xs font-bold text-[#20201f] uppercase tracking-wider">Uploads</h4>
+                      <p className="text-[10px] text-[#817e79] mt-0.5">Upload logos, images & custom files</p>
                     </div>
+
+                    {/* Contextual Target Card if an Image or Logo is selected on canvas */}
+                    {selectedElement && (selectedElement.type === 'image' || selectedElement.type === 'logo') && (
+                      <div className="p-3 rounded-lg bg-[#fff8eb] border border-[#f5d99b] text-xs">
+                        <div className="flex items-center gap-2 font-bold text-[#8c5e12]">
+                          <ImageIcon className="w-4 h-4 text-[#e26f5b]" />
+                          <span>Selected: {selectedElement.name || 'Brand Logo'}</span>
+                        </div>
+                        <p className="text-[11px] text-[#716d67] mt-1 leading-relaxed">
+                          Choose a new file to replace this logo or image on your design.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => replaceFileInputRef.current?.click()}
+                          className="mt-2.5 w-full py-2 px-3 rounded-md bg-[#e26f5b] hover:bg-[#b84d3b] text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+                        >
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>Upload & Replace File</span>
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Main Dropzone */}
+                    <label className="w-full p-5 border-2 border-dashed border-[#cfc9c1] hover:border-[#e26f5b] rounded-xl flex flex-col items-center justify-center gap-2 cursor-pointer bg-[#faf9f7] hover:bg-white text-center transition-all group shadow-2xs">
+                      <div className="w-10 h-10 rounded-full bg-white shadow-xs border border-[#eeece8] flex items-center justify-center text-[#e26f5b] group-hover:scale-110 transition-transform">
+                        <Upload className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <span className="block text-xs font-bold text-[#20201f]">
+                          Upload Image or Logo
+                        </span>
+                        <small className="text-[10px] text-[#817e79]">
+                          PNG, JPG, WEBP, or SVG
+                        </small>
+                      </div>
+                      <span className="text-[10px] text-[#e26f5b] font-medium underline">
+                        Browse from computer
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/*,.svg"
+                        onChange={handleFileUpload}
+                        className="hidden"
+                      />
+                    </label>
+
+                    {/* Quick Accents */}
+                    <div className="pt-2 border-t border-[#f0eeeb] space-y-2">
+                      <span className="text-[10px] font-bold text-[#817e79] uppercase tracking-wider">
+                        Quick Accents
+                      </span>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            addElement({
+                              id: `seal-${Date.now()}`,
+                              type: 'shape',
+                              name: 'Official Seal',
+                              shapeType: 'circle',
+                              x: Math.round(design.canvas.width / 2 - 40),
+                              y: Math.round(design.canvas.height / 2 - 40),
+                              width: 80,
+                              height: 80,
+                              fill: '#e26f5b',
+                              stroke: '#ffffff',
+                              strokeWidth: 3,
+                              zIndex: design.elements.length + 1,
+                              permissions: {
+                                editable: true,
+                                movable: true,
+                                resizable: true,
+                                rotatable: false,
+                                deletable: true,
+                                locked: false,
+                                required: false,
+                                visible: true,
+                              },
+                            })
+                          }}
+                          className="p-2.5 rounded-lg border border-[#e4e1dc] bg-[#faf9f7] hover:bg-white text-left flex items-center gap-2 cursor-pointer transition-all"
+                        >
+                          <div className="w-5 h-5 rounded-full bg-[#e26f5b] shrink-0" />
+                          <span className="text-[11px] font-semibold text-[#20201f]">Seal Badge</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            addElement({
+                              id: `pill-${Date.now()}`,
+                              type: 'shape',
+                              name: 'Dark Tag',
+                              shapeType: 'rectangle',
+                              x: Math.round(design.canvas.width / 2 - 60),
+                              y: Math.round(design.canvas.height / 2 - 20),
+                              width: 120,
+                              height: 40,
+                              fill: '#242322',
+                              zIndex: design.elements.length + 1,
+                              permissions: {
+                                editable: true,
+                                movable: true,
+                                resizable: true,
+                                rotatable: false,
+                                deletable: true,
+                                locked: false,
+                                required: false,
+                                visible: true,
+                              },
+                            })
+                          }}
+                          className="p-2.5 rounded-lg border border-[#e4e1dc] bg-[#faf9f7] hover:bg-white text-left flex items-center gap-2 cursor-pointer transition-all"
+                        >
+                          <div className="w-6 h-3 rounded-xs bg-[#242322] shrink-0" />
+                          <span className="text-[11px] font-semibold text-[#20201f]">Dark Tag</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Gallery of Uploaded Media */}
+                    {uploadedImages.length > 0 && (
+                      <div className="space-y-2 pt-2 border-t border-[#f0eeeb]">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold text-[#817e79] uppercase tracking-wider">
+                            Recent Uploads ({uploadedImages.length})
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setUploadedImages([])}
+                            className="text-[10px] text-[#817e79] hover:text-[#d44333] cursor-pointer"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          {uploadedImages.map((src, i) => (
+                            <div
+                              key={i}
+                              onClick={() => {
+                                if (selectedElement && (selectedElement.type === 'image' || selectedElement.type === 'logo')) {
+                                  updateElement(selectedElement.id, { src } as any)
+                                } else {
+                                  addElement({
+                                    id: `img-${Date.now()}`,
+                                    type: 'image',
+                                    name: 'Uploaded Image',
+                                    src,
+                                    x: 100,
+                                    y: 100,
+                                    width: 200,
+                                    height: 150,
+                                    zIndex: design.elements.length + 1,
+                                    permissions: {
+                                      editable: false,
+                                      movable: true,
+                                      resizable: true,
+                                      rotatable: false,
+                                      deletable: true,
+                                      locked: false,
+                                      required: false,
+                                      visible: true,
+                                    },
+                                  })
+                                }
+                              }}
+                              className="group relative aspect-4/3 rounded-lg border border-[#e4e1dc] bg-[#faf9f7] p-1.5 cursor-pointer hover:border-[#e26f5b] hover:shadow-xs overflow-hidden transition-all"
+                              title="Click to insert or replace"
+                            >
+                              <img src={src} alt="Upload" className="w-full h-full object-contain" />
+                              <span className="absolute inset-0 bg-[#242322]/80 text-white text-[10px] font-bold opacity-0 group-hover:opacity-100 flex items-center justify-center text-center p-1 transition-opacity">
+                                {selectedElement && (selectedElement.type === 'image' || selectedElement.type === 'logo')
+                                  ? 'Replace selected'
+                                  : '+ Add to design'}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -382,18 +560,6 @@ export function DesignEditorModal({ isOpen, onClose, onOrderSuccess }: DesignEdi
                     >
                       <Plus className="w-3.5 h-3.5" /> Add Text Heading
                     </button>
-                  </div>
-                )}
-
-                {activeTool === 'uploads' && (
-                  <div className="space-y-3">
-                    <span className="text-[10px] font-bold text-[#817e79] uppercase">Upload Images & Logos</span>
-                    <label className="w-full p-6 border-2 border-dashed border-[#cfc9c1] rounded-lg flex flex-col items-center justify-center gap-2 cursor-pointer bg-[#faf9f7] hover:bg-white text-center">
-                      <Upload className="w-5 h-5 text-[#e26f5b]" />
-                      <span className="text-xs font-semibold text-[#20201f]">Click to upload file</span>
-                      <small className="text-[10px] text-[#817e79]">PNG, JPG, WEBP, or SVG</small>
-                      <input type="file" accept="image/*,.svg" onChange={handleFileUpload} className="hidden" />
-                    </label>
                   </div>
                 )}
 
@@ -419,22 +585,6 @@ export function DesignEditorModal({ isOpen, onClose, onOrderSuccess }: DesignEdi
                   </div>
                 )}
 
-                {activeTool === 'styles' && (
-                  <div className="space-y-3">
-                    <span className="text-[10px] font-bold text-[#817e79] uppercase">Canvas Palette</span>
-                    <div className="flex flex-wrap gap-2">
-                      {['#f8f7f4', '#ffffff', '#e6aa8f', '#ef826c', '#a8b59d', '#c9b8dd', '#e6d2b6', '#8caab0', '#242322'].map((color) => (
-                        <button
-                          key={color}
-                          onClick={() => useEditorStore.setState({ design: { ...design, background: { color } } })}
-                          className="w-7 h-7 rounded-full border border-black/10 cursor-pointer shadow-xs"
-                          style={{ backgroundColor: color }}
-                          title={`Background ${color}`}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
 
                 {/* Selected Element Properties */}
                 {selectedElement && (
@@ -611,6 +761,9 @@ export function DesignEditorModal({ isOpen, onClose, onOrderSuccess }: DesignEdi
                 zoom={zoom}
                 onSelectElement={selectElement}
                 onUpdateElementPosition={(id, x, y) => updateElement(id, { x, y } as any)}
+                onUpdateElement={(id, updates) => updateElement(id, updates as any)}
+                onDuplicateElement={duplicateElement}
+                onDeleteElement={deleteElement}
                 isInteractive={true}
               />
             </div>

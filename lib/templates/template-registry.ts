@@ -73,6 +73,8 @@ export const DEFAULT_TEMPLATES: Template[] = [
           width: 680,
           height: 70,
           zIndex: 2,
+          groupId: 'group-brand-header',
+          groupName: 'Brand Title & Tagline',
           quickEditKey: 'businessName',
           quickEditLabel: 'Business name',
           permissions: {
@@ -101,6 +103,8 @@ export const DEFAULT_TEMPLATES: Template[] = [
           width: 680,
           height: 35,
           zIndex: 3,
+          groupId: 'group-brand-header',
+          groupName: 'Brand Title & Tagline',
           quickEditKey: 'headline',
           quickEditLabel: 'Tagline',
           permissions: {
@@ -498,27 +502,6 @@ export const DEFAULT_TEMPLATES: Template[] = [
       },
       fontsUsed: ['Roboto', 'Montserrat', 'Inter', 'Helvetica'],
       elements: [
-        {
-          id: 'pad-vector-bg',
-          type: 'image',
-          name: 'Vector Curves & Contact Badges',
-          src: '/files/template/sample/pad-sample-01-art.svg',
-          x: 0,
-          y: 0,
-          width: 730,
-          height: 888,
-          zIndex: 1,
-          permissions: {
-            editable: false,
-            movable: false,
-            resizable: false,
-            rotatable: false,
-            deletable: false,
-            locked: true,
-            required: true,
-            visible: true,
-          },
-        },
         {
           id: 'company-logo',
           type: 'image',

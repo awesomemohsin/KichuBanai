@@ -67,6 +67,8 @@ export interface BaseDesignElement {
   height: number
   rotation?: number
   opacity?: number
+  groupId?: string
+  groupName?: string
   permissions: ElementPermissions
   zIndex: number
 }
