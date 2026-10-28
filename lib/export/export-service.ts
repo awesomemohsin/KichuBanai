@@ -9,6 +9,57 @@ export interface RenderJpgOptions {
 }
 
 /**
+ * Breaks multi-paragraph text into lines that wrap nicely within maxWidth on an HTML5 canvas context,
+ * preventing any line overflowing off the canvas or bounding box.
+ */
+function wrapCanvasText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+  if (!maxWidth || maxWidth <= 0) return text.split('\n')
+  const paragraphs = text.split('\n')
+  const wrapped: string[] = []
+
+  for (const para of paragraphs) {
+    if (!para) {
+      wrapped.push('')
+      continue
+    }
+    const words = para.split(' ')
+    let currentLine = ''
+
+    for (let i = 0; i < words.length; i++) {
+      const word = words[i]
+      const testLine = currentLine ? `${currentLine} ${word}` : word
+      const metrics = ctx.measureText(testLine)
+
+      if (metrics.width > maxWidth && currentLine.length > 0) {
+        wrapped.push(currentLine)
+        // If an individual word is wider than maxWidth, break character-by-character
+        if (ctx.measureText(word).width > maxWidth) {
+          let charLine = ''
+          for (const char of word) {
+            if (ctx.measureText(charLine + char).width > maxWidth) {
+              wrapped.push(charLine)
+              charLine = char
+            } else {
+              charLine += char
+            }
+          }
+          currentLine = charLine
+        } else {
+          currentLine = word
+        }
+      } else {
+        currentLine = testLine
+      }
+    }
+    if (currentLine) {
+      wrapped.push(currentLine)
+    }
+  }
+
+  return wrapped
+}
+
+/**
  * Renders a KichuBanai design to an HTML5 canvas and exports as a real JPG data URL / blob.
  * For free users: permanently burns a repeated diagonal watermark into the raster pixel data.
  * For subscribers: outputs a clean, high-resolution (2x) clean JPG.
@@ -96,7 +147,14 @@ export async function renderDesignToJpg(options: RenderJpgOptions): Promise<{ da
       ctx.fillStyle = el.fill || '#000000'
       ctx.textBaseline = 'top'
 
-      const lines = el.text.split('\n')
+      // Strip formatting markers for clean rasterization
+      const cleanText = el.text
+        .replace(/\*\*(.*?)\*\*/g, '$1')
+        .replace(/\*(.*?)\*/g, '$1')
+        .replace(/<\/?(b|strong|i|em)>/gi, '')
+
+      // Wrap text within element bounding width so text never overflows off canvas
+      const lines = wrapCanvasText(ctx, cleanText, el.width)
       const lineHeight = fontSize * (el.lineHeight || 1.3)
       lines.forEach((line, index) => {
         let textX = el.x

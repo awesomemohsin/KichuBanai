@@ -42,25 +42,72 @@ export function validateProductionSvg(svgString: string): {
 /**
  * Converts a text string into vector path geometry.
  * Emits genuine vector <path d="..." /> SVG markup.
+/**
+ * Breaks text into lines wrapping within textEl.width
+ */
+function wrapSvgText(text: string, fontSize: number, maxWidth: number): string[] {
+  if (!maxWidth || maxWidth <= 0) return text.split('\n')
+  const charWidth = fontSize * 0.58
+  const maxChars = Math.max(1, Math.floor(maxWidth / charWidth))
+  const paragraphs = text.split('\n')
+  const wrapped: string[] = []
+
+  for (const para of paragraphs) {
+    if (!para) {
+      wrapped.push('')
+      continue
+    }
+    const words = para.split(' ')
+    let currentLine = ''
+
+    for (const word of words) {
+      const testLine = currentLine ? `${currentLine} ${word}` : word
+      if (testLine.length > maxChars && currentLine.length > 0) {
+        wrapped.push(currentLine)
+        currentLine = word
+      } else {
+        currentLine = testLine
+      }
+    }
+    if (currentLine) {
+      wrapped.push(currentLine)
+    }
+  }
+
+  return wrapped
+}
+
+/**
+ * Converts a text string into vector path geometry.
+ * Emits genuine vector <path d="..." /> SVG markup.
  */
 function textToVectorPathMarkup(textEl: TextElement): string {
-  // Approximate vector path bounding geometry for the glyph run
-  // Every letter is transformed into a set of outlined vector contour paths
   const fontSize = textEl.fontSize
   const fill = textEl.fill || '#000000'
-  const lines = textEl.text.split('\n')
-  const lineHeight = (textEl.lineHeight || 1.2) * fontSize
+  const cleanText = textEl.text
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/<\/?(b|strong|i|em)>/gi, '')
+  const lines = wrapSvgText(cleanText, fontSize, textEl.width)
+  const lineHeight = (textEl.lineHeight || 1.3) * fontSize
+  const charWidth = fontSize * 0.58
 
   let pathSvg = `<g id="vector-text-${textEl.id}" transform="translate(${textEl.x}, ${textEl.y})">`
 
   lines.forEach((line, lineIndex) => {
     const yBaseline = (lineIndex + 1) * lineHeight
+    const totalLineWidth = line.length * (charWidth + (textEl.letterSpacing || 0))
     let currentX = 0
+
+    if (textEl.textAlign === 'center' && textEl.width > totalLineWidth) {
+      currentX = (textEl.width - totalLineWidth) / 2
+    } else if (textEl.textAlign === 'right' && textEl.width > totalLineWidth) {
+      currentX = textEl.width - totalLineWidth
+    }
 
     // For each character in the string, construct outlined vector path bezier/straight contour segments
     for (let i = 0; i < line.length; i++) {
       const char = line[i]
-      const charWidth = fontSize * 0.58
       if (char === ' ') {
         currentX += charWidth * 0.6
         continue
